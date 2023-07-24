@@ -181,43 +181,44 @@ class CRBM(object):
             else:
                 conv = tf.nn.conv1d(operand, self.kernels, stride=1, padding='VALID')
             if self.gaussian_unit:
-                conv = tf.math.divide_no_nan(conv, self.gaussian_variance)
+                conv = tf.div(conv, self.gaussian_variance)
             bias = tf.nn.bias_add(conv, self.biases_H)
             if self.prob_maxpooling:
                 'SPECIFIC CASE where we enable probabilistic max pooling'
-                exp = tf.math.softplus(bias)  # to avoid overflows that cause nan value during training
-                # exp = tf.math.exp(bias)
+                exp = tf.exp(bias)
                 custom_kernel = tf.constant(1.0, shape=[2, self.filter_number, 1])
                 sum = tf.nn.depthwise_conv1d(exp, custom_kernel, stride=2, padding='VALID')
                 sum = tf.add(1.0, sum)
-                ret_kernel = np.eye(self.filter_number)[..., np.newaxis, :]
+                ret_kernel = np.zeros(( 2, self.filter_number, self.filter_number))
+                for i in range(2):
+                    for k in range(self.filter_number):
+                        ret_kernel[i, k, k] = 1
                 custom_kernel_bis = tf.constant(ret_kernel, dtype=tf.float32)
                 sum_bis = tf.nn.conv1d_transpose(sum, custom_kernel_bis, (
-                self.batch_size, self.hidden_length, self.filter_number), strides=2, padding='VALID', name=None)
+                    self.batch_size, self.hidden_length, self.filter_number), stride=2, padding='VALID', name=None)
                 if result == 'hidden':
                     'We want to obtain HIDDEN layer configuration'
-                    return tf.math.divide_no_nan(exp, sum_bis)
+                    return tf.div(exp, sum_bis)
                 elif result == 'pooling':
                     'We want to obtain POOLING layer configuration'
-                    return tf.subtract(1.0, tf.math.divide_no_nan(1.0, sum))
+                    return tf.sub(1.0, tf.div(1.0, sum))
             return tf.sigmoid(bias)
-
         'Computing VISIBLE layer with HIDDEN layer given'
         'If gaussian then return the mean of the normal distribution from wich visible unit are drawn, covariance matrix being self.gaussian_variance square identity'
         'If not gaussian then return the binary probability wich is sigmoid'
         if method == 'backward':
             if self.padding:
-                fp = self._get_flipped_kernel()
-                conv = tf.nn.conv1d(operand, fp, stide=1, padding='SAME')
+                conv = tf.nn.conv1d(operand, self._get_flipped_kernel(), stride=1, padding='SAME')
             else:
                 conv = tf.nn.conv1d(self._get_padded_hidden(operand), self._get_flipped_kernel(), stride=1,
                                     padding='VALID')
             if self.gaussian_unit:
-                conv = tf.multiply(conv, self.gaussian_variance)
+                conv = tf.mul(conv, self.gaussian_variance)
             bias = tf.nn.bias_add(conv, self.biases_V)
             if self.gaussian_unit:
                 return bias
             return tf.sigmoid(bias)
+
 
     def draw_samples(self, mean_activation, method='forward'):
         """INTENT : Draw samples from distribution of specified parameter
@@ -234,19 +235,17 @@ class CRBM(object):
             dist = tfp.distributions.MultivariateNormalDiag(mu, self.sigma)
             samples = dist.sample()
             return tf.reshape(samples,
-                              [self.batch_size, self.visible_height, self.visible_width, self.visible_channels])
+                              [self.batch_size, self.visible_length, self.visible_channels])
         elif method == 'forward':
-            height = self.hidden_height
-            width = self.hidden_width
+            length = self.hidden_length
             channels = self.filter_number
         elif method == 'backward':
-            height = self.visible_height
-            width = self.visible_width
+            length = self.visible_length
             channels = self.visible_channels
 
-        return tf.where(tf.random_uniform([self.batch_size, height, width, channels]) - mean_activation < 0,
-                        tf.ones([self.batch_size, height, width, channels]),
-                        tf.zeros([self.batch_size, height, width, channels]))
+        return tf.where(tf.random_uniform([self.batch_size, length, channels]) - mean_activation < 0,
+                        tf.ones([self.batch_size, length, channels]),
+                        tf.zeros([self.batch_size, length, channels]))
 
     def do_contrastive_divergence(self, data, n=1, global_step=0):
         """INTENT : Do one step of n-contrastive divergence algorithm for leaning weight and biases of the CRBM
@@ -263,29 +262,30 @@ class CRBM(object):
         'FOR WEIGHT'
         # [vchannels,vheight,vwidth,batch_size] conv with [hiddenhei,hiddenwidth,batch_size,hiddenchannel] give a [vchannels,filterhei,filterwidth,hiddenchannel] filter
         if self.padding:
-            positive = tf.nn.conv2d(self._get_padded_visible(tf.transpose(V0, perm=[3, 1, 2, 0])),
-                                    tf.transpose(Q0, perm=[1, 2, 0, 3]), [1, 1, 1, 1], padding='VALID')
-            negative = tf.nn.conv2d(self._get_padded_visible(tf.transpose(VN, perm=[3, 1, 2, 0])),
-                                    tf.transpose(QN, perm=[1, 2, 0, 3]), [1, 1, 1, 1], padding='VALID')
+            positive = tf.nn.conv1d(self._get_padded_visible(tf.transpose(V0, perm=[0, 2, 1])),
+                                    tf.transpose(Q0, perm=[1, 0, 2]), stride=1, padding='VALID')
+
+            negative = tf.nn.conv1d(self._get_padded_visible(tf.transpose(VN, perm=[0, 2, 1])),
+                                    tf.transpose(QN, perm=[1, 0, 2]), stride=1, padding='VALID')
         else:
-            positive = tf.nn.conv2d(tf.transpose(V0, perm=[3, 1, 2, 0]), tf.transpose(Q0, perm=[1, 2, 0, 3]),
-                                    [1, 1, 1, 1], padding='VALID')
-            negative = tf.nn.conv2d(tf.transpose(VN, perm=[3, 1, 2, 0]), tf.transpose(QN, perm=[1, 2, 0, 3]),
-                                    [1, 1, 1, 1], padding='VALID')
+            positive = tf.nn.conv2d(tf.transpose(V0, perm=[0, 2, 1]), tf.transpose(Q0, perm=[1, 0, 2]),
+                                    stride=1, padding='VALID')
+            negative = tf.nn.conv2d(tf.transpose(VN, perm=[0, 2, 1]), tf.transpose(QN, perm=[1, 0, 2]),
+                                    stride=1, padding='VALID')
         ret = positive - negative
         if self.gaussian_unit:
             ret = tf.math.divide_no_nan(ret, self.gaussian_variance)
-        g_weight = tf.math.divide_no_nan(tf.transpose(ret, perm=[1, 2, 0, 3]), self.batch_size)
+        g_weight = tf.math.divide_no_nan(tf.transpose(ret, perm=[1, 0, 2]), self.batch_size)
         g_weight_sparsity = self._get_param_sparsity_penalty('kernel', Q0, V0)
         g_weight_l2 = self._get_param_weight_penalty(self.kernels)
 
         'FOR BIAS VISIBLE'
-        g_biais_V = tf.math.divide_no_nan(tf.math.reduce_sum(tf.subtract(V0, VN), [0, 1, 2]), self.batch_size)
+        g_biais_V = tf.math.divide_no_nan(tf.math.reduce_sum(tf.subtract(V0, VN), [0,1]), self.batch_size)
         if self.gaussian_unit:
             g_biais_V = tf.math.divide_no_nan(g_biais_V, self.gaussian_variance * self.gaussian_variance)
 
         'FOR BIAS HIDDEN'
-        g_biais_H = tf.math.divide_no_nan(tf.math.reduce_sum(tf.subtract(Q0, QN), [0, 1, 2]), self.batch_size)
+        g_biais_H = tf.math.divide_no_nan(tf.math.reduce_sum(tf.subtract(Q0, QN), [0, 1]), self.batch_size)
         g_biais_H_sparsity = self._get_param_sparsity_penalty('hidden_bias', Q0, V0)
         'UPDATE ALL'
         ret_w = self._apply_grad(self.kernels, g_weight, self.vitesse_kernels, wd=True, wd_value=g_weight_l2,
@@ -393,15 +393,15 @@ class CRBM(object):
         mean = tf.math.reduce_sum(Q0, [0], keep_dims=True)
         baseline = tf.multiply(tf.subtract(self.sparsity_target, mean), tf.multiply(tf.subtract(1.0, Q0), Q0))
         if name == 'hidden_bias':
-            return tf.multiply(ret, tf.math.reduce_sum(baseline, [0, 1, 2]))
+            return tf.multiply(ret, tf.math.reduce_sum(baseline, [0, 1]))
         if name == 'kernel':
             if self.padding:
-                retBis = tf.nn.conv2d(self._get_padded_visible(tf.transpose(V0, perm=[3, 1, 2, 0])),
-                                      tf.transpose(baseline, perm=[1, 2, 0, 3]), [1, 1, 1, 1], padding='VALID')
+                retBis = tf.nn.conv1d(self._get_padded_visible(tf.transpose(V0, perm=[2, 1, 0])),
+                                      tf.transpose(baseline, perm=[1, 0, 2]), stride=1, padding='VALID')
             else:
-                retBis = tf.nn.conv2d(tf.transpose(V0, perm=[3, 1, 2, 0]), tf.transpose(baseline, perm=[1, 2, 0, 3]),
-                                      [1, 1, 1, 1], padding='VALID')
-            retBis = tf.transpose(retBis, perm=[1, 2, 0, 3])
+                retBis = tf.nn.conv1d(tf.transpose(V0, perm=[2, 1, 0]), tf.transpose(baseline, perm=[1, 0, 2]),
+                                      stride=1, padding='VALID')
+            retBis = tf.transpose(retBis, perm=[1, 0, 2])
             return tf.multiply(ret, retBis)
 
     def _get_param_weight_penalty(self, operand):
@@ -417,7 +417,7 @@ class CRBM(object):
         # rev = tf.reverse(self.kernels,[True,True,False,False]) # Original
         rev = tf.reverse(self.kernels, [True, False])  # TO CHECK
         # rev = tf.reverse(self.kernels,[0,1]) # TO CHECK
-        return tf.transpose(rev, perm=[0, 1, 3, 2])
+        return tf.transpose(rev, perm=[1, 0, 2])
 
     def _get_padded_hidden(self, hidden):
         """INTENT : Add padding to the hidden layer so that it can be convolved with flipped kernel and give the same size as input
@@ -427,8 +427,7 @@ class CRBM(object):
         ------------------------------------------------------------------------------------------------------------------------------------------
         REMARK : only is self.padding is False because if self.padding is True then this is not needed"""
 
-        return tf.pad(hidden, [[0, 0], [self.filter_height - 1, self.filter_height - 1],
-                               [self.filter_width - 1, self.filter_width - 1], [0, 0]])
+        return tf.pad(hidden, [[0, 0], [self.filter_length - 1, self.filter_length - 1], [0, 0]])
 
     def _get_padded_visible(self, visible):
         """INTENT : Add padding to the visible layer so that it can be convolved with hidden layer to compute weight gradient update
@@ -438,9 +437,7 @@ class CRBM(object):
         ------------------------------------------------------------------------------------------------------------------------------------------
         REMARK : only is self.padding is True because if self.padding is False then this is not needed"""
 
-        return tf.pad(visible, [[0, 0], [np.floor((self.filter_height - 1) / 2).astype(int),
-                                         np.ceil((self.filter_height - 1) / 2).astype(int)],
-                                [np.floor((self.filter_width - 1) / 2).astype(int),
-                                 np.ceil((self.filter_width - 1) / 2).astype(int)], [0, 0]])
+        return tf.pad(visible, [[0, 0], [np.floor((self.filter_length - 1) / 2).astype(int),
+                                         np.ceil((self.filter_length - 1) / 2).astype(int)], [0, 0]])
 
 
