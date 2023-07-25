@@ -13,25 +13,25 @@ class CDBN(object):
 
     def __init__(self, name, batch_size, path, data, session, verbosity=2):
         """INTENT : Initialization of a Convolutional Deep Belief Network
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    PARAMETERS :
-    name         :        name of the CDBN
-    batch_size   :        batch size to work with
-    path         :        where to save and restore parameter of trained layer
-    train_data   :        data to use the CDBN for training
-    test_data    :        data to use the CDBN for testing
-    session      :        tensorflow session (context) to use this CDBN in
-    verbosity    :        verbosity of the training  (0 is low  1 is medium and 2 is high)
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    ATTRIBUTS :
-    number_layer             :        number of layer (is updated everytime add_layer() method is called
-    layer_name_to_object     :        link between layer name and their corresponding crbm object
-    layer_level_to_name      :        link between layer level and it name
-    layer_name_to_level      :        link between layer name and it level
-    input                    :        shape of the visible layer of the first layer ie where the data is to be clamped to
-    fully_connected_layer    :        where the first fully connected layer occur
-    locked                   :        if the CDBN model is completed ie all layer have been added
-    softmax_layer            :        if the model has a softmax layer on top"""
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        PARAMETERS :
+        name         :        name of the CDBN
+        batch_size   :        batch size to work with
+        path         :        where to save and restore parameter of trained layer
+        train_data   :        data to use the CDBN for training
+        test_data    :        data to use the CDBN for testing
+        session      :        tensorflow session (context) to use this CDBN in
+        verbosity    :        verbosity of the training  (0 is low  1 is medium and 2 is high)
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        ATTRIBUTS :
+        number_layer             :        number of layer (is updated everytime add_layer() method is called
+        layer_name_to_object     :        link between layer name and their corresponding crbm object
+        layer_level_to_name      :        link between layer level and it name
+        layer_name_to_level      :        link between layer name and it level
+        input                    :        shape of the visible layer of the first layer ie where the data is to be clamped to
+        fully_connected_layer    :        where the first fully connected layer occur
+        locked                   :        if the CDBN model is completed ie all layer have been added
+        softmax_layer            :        if the model has a softmax layer on top"""
 
         self.name = name
         self.batch_size = batch_size
@@ -51,17 +51,17 @@ class CDBN(object):
 
     def _auto_calulate_layer(self, layer_number, fully_connected):
         """INTENT : Calculate automatically the size of the input layer that we are building based on the previous layer configuration
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    PARAMETERS :
-    layer_number          :         which layer is being built (number)
-    fully_connected       :         whether the current layer is fully connected or not
-    prob_maxpooling       :         whether the current layer has prob_maxpooling enabled or not
-    padding               :         whether the current layer has padding enabled or not
-    f_height              :         f_height of current layer
-    f_width               :         f_width of current layer
-    f_number              :         f_number of current layer
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    REMARK : this works for deep layers only (not the first one) """
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        PARAMETERS :
+        layer_number          :         which layer is being built (number)
+        fully_connected       :         whether the current layer is fully connected or not
+        prob_maxpooling       :         whether the current layer has prob_maxpooling enabled or not
+        padding               :         whether the current layer has padding enabled or not
+        f_height              :         f_height of current layer
+        f_width               :         f_width of current layer
+        f_number              :         f_number of current layer
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        REMARK : this works for deep layers only (not the first one) """
 
         previous_layer = self.layer_name_to_object[self.layer_level_to_name[layer_number - 1]]
         if not fully_connected:
@@ -69,43 +69,43 @@ class CDBN(object):
             v_channels = previous_layer.filter_number
         else:
             v_length = 1
-            v_channels = (previous_layer.hidden_length / (
-                        previous_layer.prob_maxpooling + 1)) ** 2 * previous_layer.filter_number
+            v_channels = (previous_layer.hidden_length / (previous_layer.prob_maxpooling + 1)) ** 2 * previous_layer.filter_number
         return int(v_length), int(v_channels)
 
     def add_layer(self, name, fully_connected=True, v_length="auto", v_channels="auto", f_length=1,
-                  f_number=400, init_biases_H=-3, init_biases_V=0.01, init_weight_stddev=0.01,
+                  f_number=400,
+                  init_biases_H=-3, init_biases_V=0.01, init_weight_stddev=0.01,
                   gaussian_unit=True, gaussian_variance=0.2,
                   prob_maxpooling=False, padding=False,
                   learning_rate=0.0001, learning_rate_decay=0.5, momentum=0.9, decay_step=50000,
                   weight_decay=0.1, sparsity_target=0.1, sparsity_coef=0.1):
         """INTENT : Add a layer to the CDBN (on the top)
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    PARAMETERS : (same as for CRBM)
-    name                  :         name of the RBM
-    fully_connected       :         specify if the RBM is fully connected (True) or convolutional (False)     |   if True then obviously all height and width are 1
-    v_height              :         height of the visible layer (input)
-    v_width               :         width of the visible layer (input)
-    v_channels            :         numbers of channels of the visible layer (input)
-    f_height              :         height of the filter to apply to the visible layer
-    f_width               :         width of the filter to apply to the visible layer
-    f_number              :         number of filters to apply to the visible layer
-    init_biases_H         :         initialization value for the bias of the hidden layer
-    init_biases_V         :         initialization value for the bias of the visible layer
-    init_weight_stddev    :         initialization value of the standard deviation for the kernel
-    gaussian_unit         :         True if using gaussian unit for the visible layer, false if using binary unit
-    gaussian_variance     :         Value of the variance of the gaussian distribution of the visible layer (only for gaussian visible unit)
-    prob_maxpooling       :         True if the CRBM also include a probabilistic max pooling layer on top of the hidden layer (only for convolutional RBM)
-    padding               :         True if the visible and hidden layer have same dimension (only for convolutional RBM)
-    learning_rate         :     learning rate for gradient update
-    learning_rate_decay   :     value of the exponential decay
-    momentum              :     coefficient of the momemtum in the gradient descent
-    decay_step            :     number of step before applying gradient decay
-    weight_decay          :     coefficient of the weight l2 norm regularization
-    sparsity_target       :     probability target of the activation of the hidden units
-    sparsity_coef         :     coefficient of the sparsity regularization term
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    REMARK : Dynamically update CDBN global view of the model"""
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        PARAMETERS : (same as for CRBM)
+        name                  :         name of the RBM
+        fully_connected       :         specify if the RBM is fully connected (True) or convolutional (False)     |   if True then obviously all height and width are 1
+        v_height              :         height of the visible layer (input)
+        v_width               :         width of the visible layer (input)
+        v_channels            :         numbers of channels of the visible layer (input)
+        f_height              :         height of the filter to apply to the visible layer
+        f_width               :         width of the filter to apply to the visible layer
+        f_number              :         number of filters to apply to the visible layer
+        init_biases_H         :         initialization value for the bias of the hidden layer
+        init_biases_V         :         initialization value for the bias of the visible layer
+        init_weight_stddev    :         initialization value of the standard deviation for the kernel
+        gaussian_unit         :         True if using gaussian unit for the visible layer, false if using binary unit
+        gaussian_variance     :         Value of the variance of the gaussian distribution of the visible layer (only for gaussian visible unit)
+        prob_maxpooling       :         True if the CRBM also include a probabilistic max pooling layer on top of the hidden layer (only for convolutional RBM)
+        padding               :         True if the visible and hidden layer have same dimension (only for convolutional RBM)
+        learning_rate         :     learning rate for gradient update
+        learning_rate_decay   :     value of the exponential decay
+        momentum              :     coefficient of the momemtum in the gradient descent
+        decay_step            :     number of step before applying gradient decay
+        weight_decay          :     coefficient of the weight l2 norm regularization
+        sparsity_target       :     probability target of the activation of the hidden units
+        sparsity_coef         :     coefficient of the sparsity regularization term
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        REMARK : Dynamically update CDBN global view of the model"""
 
         try:
             if self.locked:
@@ -124,11 +124,10 @@ class CDBN(object):
                 'layer auto calculation'
                 if v_length == "auto" or v_channels == "auto":
                     if self.layer_name_to_level[name] != 0:
-                        if v_length == "auto" and v_channels == "auto":
+                        if v_length == "auto"  and v_channels == "auto":
                             v_length, v_channels = self._auto_calulate_layer(self.layer_name_to_level[name],
                                                                                       fully_connected, prob_maxpooling,
-                                                                                      padding, f_length,
-                                                                                      f_number)
+                                                                                      padding, f_length, f_number)
                         else:
                             raise ValueError('You either set all 3 parameters to "auto" or none')
                     else:
@@ -138,19 +137,16 @@ class CDBN(object):
                     self.input = (self.batch_size, v_length, v_channels)
                 elif not fully_connected:
                     ret_out = self.layer_name_to_object[self.layer_level_to_name[self.number_layer - 1]]
-                    if not (v_length == ret_out.hidden_height / (ret_out.prob_maxpooling + 1)):
+                    if not (v_length == ret_out.hidden_length / (ret_out.prob_maxpooling + 1)):
                         raise ValueError(
-                            'Trying to add layer ' + name + ' to CDBN ' + self.name + ' which height of visible layer does not match height of output of previous layer')
-                    if not (v_le == ret_out.hidden_width / (ret_out.prob_maxpooling + 1)):
-                        raise ValueError(
-                            'Trying to add layer ' + name + ' to CDBN ' + self.name + ' which width of visible layer does not match width of output of previous layer')
+                            'Trying to add layer ' + name + ' to CDBN ' + self.name + ' which length of visible layer does not match length of output of previous layer')
                     if not (v_channels == ret_out.filter_number):
                         raise ValueError(
                             'Trying to add layer ' + name + ' to CDBN ' + self.name + ' which number of channels of visible layer does not match number of channels of output of previous layer')
                 if fully_connected and self.fully_connected_layer is None:
                     self.fully_connected_layer = self.number_layer
-                self.layer_name_to_object[name] = crbm.CRBM(name, fully_connected, v_height, v_width, v_channels,
-                                                            f_height, f_width, f_number,
+                self.layer_name_to_object[name] = crbm.CRBM(name, fully_connected, v_length, v_channels,
+                                                            f_length, f_number,
                                                             init_biases_H, init_biases_V, init_weight_stddev,
                                                             gaussian_unit, gaussian_variance,
                                                             prob_maxpooling, padding,
@@ -171,16 +167,13 @@ class CDBN(object):
                 else:
                     message = 'Successfully adding convolutional layer ' + name + ' to CDBN ' + self.name
                     if self.verbosity > 0:
-                        message += ' with configuration of:\nVisible: (' + str(v_height) + ',' + str(
-                            v_width) + ',' + str(v_channels) + ')\n'
-                        message += 'Filters: (' + str(f_height) + ',' + str(f_width) + ',' + str(f_number) + ')'
+                        message += ' with configuration of:\nVisible: (' + str(v_length) + ',' + str(v_channels) + ')\n'
+                        message += 'Filters: (' + str(f_length) +  ',' + str(f_number) + ')'
                     if self.verbosity > 1 and padding:
                         message += ' with padding ON (SAME)'
                     elif padding == False:
                         message += 'with no padding and stride = 1'
-                    message += '\nHidden:  (' + str(self.layer_name_to_object[name].hidden_height) + ',' + str(
-                        self.layer_name_to_object[name].hidden_width) + ',' + str(
-                        self.layer_name_to_object[name].filter_number) + ')'
+                    message += '\nHidden:  (' + str(self.layer_name_to_object[name].hidden_length) + ','  + str(self.layer_name_to_object[name].filter_number) + ')'
                     if self.verbosity > 1 and prob_maxpooling:
                         message += '\nProbabilistic max pooling ON with dimension (2,2) and stride = 2: '
                     elif prob_maxpooling == False:
@@ -194,9 +187,9 @@ class CDBN(object):
 
     def add_softmax_layer(self, output_classes, learning_rate, fine_tune=False):
         """INTENT : add a softmax layer on top of the CDBN
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    PARAMETERS :
-    output_classes         :    number of class for the softmax output"""
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        PARAMETERS :
+        output_classes         :    number of class for the softmax output"""
 
         try:
             if self.locked:
@@ -209,8 +202,7 @@ class CDBN(object):
                 self.softmax_layer = True
                 self.output_classes = output_classes
                 ret_out = self.layer_name_to_object[self.layer_level_to_name[self.number_layer - 1]]
-                self.output = int(ret_out.hidden_height / (ret_out.prob_maxpooling + 1) * ret_out.hidden_width / (
-                            ret_out.prob_maxpooling + 1) * ret_out.filter_number)
+                self.output = int(ret_out.hidden_length / (ret_out.prob_maxpooling + 1)  * ret_out.filter_number)
                 with tf.variable_scope('softmax_layer_cdbn'):
                     with tf.device('/cpu:0'):
                         self.W = tf.get_variable('weights_softmax', (self.output, output_classes),
@@ -254,8 +246,7 @@ class CDBN(object):
             else:
                 if not self.softmax_layer:
                     ret_out = self.layer_name_to_object[self.layer_level_to_name[self.number_layer - 1]]
-                    self.output = ret_out.hidden_height / (ret_out.prob_maxpooling + 1) * ret_out.hidden_width / (
-                                ret_out.prob_maxpooling + 1) * ret_out.filter_number
+                    self.output = ret_out.hidden_length / (ret_out.prob_maxpooling + 1) * ret_out.filter_number
                 self.locked = True
 
                 if self.verbosity > 0:
@@ -268,15 +259,15 @@ class CDBN(object):
     def manage_layers(self, layers_to_pretrain, layers_to_restore, step_for_pretraining, n_for_pretraining,
                       step_softmax=0, restore_softmax=False, fine_tune=False, threaded_input=False, learning_rate=0.5):
         """INTENT : manage the initialization / restoration of the different layers of the CDBN
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    PARAMETERS :
-    layers_to_pretrain             :         layers to be initialized from scratch and pretrained (names list)
-    layers_to_restore              :         layers to be restored (names list)
-    step_for_pretraining           :         step of training for layers to be pretrained
-    n_for_pretraining              :         length of the gibbs chain for pretraining
-    step_softmax                   :         step for training softmax layer
-    is_softmax                     :         is there a softmax layer
-    restore_softmax                :         should it be restored (True) or trained from scratch (False)"""
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        PARAMETERS :
+        layers_to_pretrain             :         layers to be initialized from scratch and pretrained (names list)
+        layers_to_restore              :         layers to be restored (names list)
+        step_for_pretraining           :         step of training for layers to be pretrained
+        n_for_pretraining              :         length of the gibbs chain for pretraining
+        step_softmax                   :         step for training softmax layer
+        is_softmax                     :         is there a softmax layer
+        restore_softmax                :         should it be restored (True) or trained from scratch (False)"""
 
         try:
             if not self.locked:
@@ -423,11 +414,11 @@ class CDBN(object):
 
     def _pretrain_layer(self, rbm_layer_name, number_step, n=1):
         """INTENT : Pretrain the given layer
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    PARAMETERS :
-    rbm_layer_name         :        name of CRBM layer that we want to do one step of pretaining
-    number_step            :        number of step to use for training
-    n                      :        length of gibbs chain to use"""
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        PARAMETERS :
+        rbm_layer_name         :        name of CRBM layer that we want to do one step of pretaining
+        number_step            :        number of step to use for training
+        n                      :        length of gibbs chain to use"""
 
         start = time.time()
         if self.verbosity > 0:
@@ -490,10 +481,10 @@ class CDBN(object):
 
     def _do_softmax_training(self, step=5000, fine_tune=False, learning_rate=0.5):
         """INTENT : Train the softmax output layer of our CDBN
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    PARAMETERS :
-    step         :        number of steps for training
-    save_softmax :        whether softmax layer should be saved or not"""
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        PARAMETERS :
+        step         :        number of steps for training
+        save_softmax :        whether softmax layer should be saved or not"""
 
         if self.verbosity > 0:
             print('--------------------------')
@@ -529,11 +520,11 @@ class CDBN(object):
 
     def _save_layer(self, rbm_layer_name, step):
         """INTENT : Save given layer
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    PARAMETERS :
-    rbm_layer_name         :        name of CRBM layer that we want to save
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    REMARK : if rbm_layer_name is softmax_layer then save softmax parameter"""
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        PARAMETERS :
+        rbm_layer_name         :        name of CRBM layer that we want to save
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        REMARK : if rbm_layer_name is softmax_layer then save softmax parameter"""
 
         checkpoint_path = os.path.join(self.path + "/" + rbm_layer_name, 'model.ckpt')
         if rbm_layer_name == 'softmax_layer':
@@ -544,11 +535,11 @@ class CDBN(object):
 
     def _restore_layer(self, rbm_layer_name):
         """INTENT : Restore given layer
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    PARAMETERS :
-    rbm_layer_name         :        name of CRBM layer that we want to restore
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    REMARK : if rbm_layer_name is softmax_layer then restore softmax parameter"""
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        PARAMETERS :
+        rbm_layer_name         :        name of CRBM layer that we want to restore
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        REMARK : if rbm_layer_name is softmax_layer then restore softmax parameter"""
 
         ckpt = tf.train.get_checkpoint_state(self.path + "/" + rbm_layer_name)
         if rbm_layer_name == 'softmax_layer':
@@ -559,20 +550,20 @@ class CDBN(object):
 
     def _init_layer(self, rbm_layer_name, from_scratch=True):
         """INTENT : Initialize given layer
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    PARAMETERS :
-    rbm_layer_name         :        name of CRBM layer that we want to initialize
-    from_scratch           :        if we initialize all the variable (from_scratch is True) or not """
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        PARAMETERS :
+        rbm_layer_name         :        name of CRBM layer that we want to initialize
+        from_scratch           :        if we initialize all the variable (from_scratch is True) or not """
 
         return self.session.run(self.layer_name_to_object[rbm_layer_name].init_parameter(from_scratch))
 
     def _get_input_level(self, layer_level, input_data):
 
         """INTENT : Get the input from the bottom to the visible layer of the given level LAYER_LEVEL
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    PARAMETERS :
-    layer_level         :        level of the layer we need to go from bottom up to
-    input_data          :        input data for the visible layer of the bottom of the cdbn"""
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        PARAMETERS :
+        layer_level         :        level of the layer we need to go from bottom up to
+        input_data          :        input data for the visible layer of the bottom of the cdbn"""
 
         ret_data = input_data
         if not layer_level == 0:
@@ -590,12 +581,12 @@ class CDBN(object):
 
     def _one_step_pretraining(self, rbm_layer_name, visible_input, n, step):
         """INTENT : Do one step of contrastive divergence for the given RBM
-    ------------------------------------------------------------------------------------------------------------------------------------------
-    PARAMETERS :
-    rbm_layer_name         :        name of CRBM layer that we want to do one step of pretaining
-    visible_input          :        configuration of the visible layer of the CRBM to train
-    n                      :        length of the gibbs chain for the contrastive divergence
-    step                   :        step we are at (for the learning rate decay computation)"""
+        ------------------------------------------------------------------------------------------------------------------------------------------
+        PARAMETERS :
+        rbm_layer_name         :        name of CRBM layer that we want to do one step of pretaining
+        visible_input          :        configuration of the visible layer of the CRBM to train
+        n                      :        length of the gibbs chain for the contrastive divergence
+        step                   :        step we are at (for the learning rate decay computation)"""
 
         return self.layer_name_to_object[rbm_layer_name].do_contrastive_divergence(visible_input, n, step)
 
