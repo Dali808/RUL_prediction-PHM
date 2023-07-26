@@ -4,8 +4,7 @@ import numpy as np
 import time
 import os
 import CRBM as crbm
-import math
-import matplotlib.pyplot as plt
+
 
 
 class CDBN(object):
